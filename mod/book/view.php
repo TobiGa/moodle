@@ -200,6 +200,26 @@ if ($book->navstyle) {
         $islastchapter = true;
     }
 }
+// else when navstyle is TOC
+else
+{
+    //logic from classes/external.php
+    //complete when last chapter is called
+    $firstchapterid = 0;
+    $lastchapterid = 0;
+
+    foreach ($chapters as $ch) {
+        if ($ch->hidden) {
+            continue;
+        }
+        if (!$firstchapterid) {
+            $firstchapterid = $ch->id;
+        }
+        $lastchapterid = $ch->id;
+    }    
+    
+    $islastchapter = ($chapter->id == $lastchapterid) ? true : false;
+}
 
 book_view($book, $chapter, $islastchapter, $course, $cm, $context);
 
