@@ -545,7 +545,7 @@ class core_external extends external_api {
                 'contextid' => $contextid,
             ]);
 
-        $context = \context::instance_by_id($contextid);
+        $context = \context_system::instance();
         self::validate_context($context);
 
         return \core\notification::fetch_as_array($PAGE->get_renderer('core'));
