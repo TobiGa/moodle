@@ -505,9 +505,7 @@ class core_external extends external_api {
      */
     public static function fetch_notifications_parameters() {
         return new external_function_parameters(
-            array(
-                'contextid' => new external_value(PARAM_INT, 'Context ID', VALUE_REQUIRED),
-            ));
+            array());
     }
 
     /**
@@ -538,14 +536,12 @@ class core_external extends external_api {
      * @return array
      * @since Moodle 3.1
      */
-    public static function fetch_notifications($contextid) {
+    public static function fetch_notifications() {
         global $PAGE;
 
-        self::validate_parameters(self::fetch_notifications_parameters(), [
-                'contextid' => $contextid,
-            ]);
+        self::validate_parameters(self::fetch_notifications_parameters(), []);
 
-        $context = \context::instance_by_id($contextid);
+        $context = \context_system::instance();
         self::validate_context($context);
 
         return \core\notification::fetch_as_array($PAGE->get_renderer('core'));
