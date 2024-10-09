@@ -662,7 +662,9 @@ class html_writer {
 
             foreach ($table->data as $key => $row) {
                 if (($row === 'hr') && ($countcols)) {
-                    $output .= self::tag('td', self::tag('div', '', ['class' => 'tabledivider']), ['colspan' => $countcols]);
+                    $output .= self::tag('tr',
+                        self::tag('td', self::tag('div', '', ['class' => 'tabledivider']), ['colspan' => $countcols])
+                    );
                 } else {
                     // Convert array rows to html_table_rows and cell strings to html_table_cell objects.
                     if (!($row instanceof html_table_row)) {
@@ -740,8 +742,8 @@ class html_writer {
                         }
                         $output .= self::tag($tagtype, $cell->text, $tdattributes) . "\n";
                     }
+                    $output .= self::end_tag('tr') . "\n";
                 }
-                $output .= self::end_tag('tr') . "\n";
             }
             $output .= self::end_tag('tbody') . "\n";
         }
