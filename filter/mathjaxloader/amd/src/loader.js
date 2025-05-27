@@ -32,7 +32,7 @@ import {
  * @param {Object} params List of configuration params containing mathjaxurl, mathjaxconfig (text) and lang
  */
 export const configure = (params) => {
-    loadMathJax(params.mathjaxurl, () => {
+    loadMathJax(params.mathjaxurl, params.mathjaxconfig, () => {
         if (window.MathJax) {
             // Let's still set the locale even if the localization is not yet ported to version 3.2.2
             // https://docs.mathjax.org/en/v3.2-latest/upgrading/v2.html#not-yet-ported-to-version-3.
@@ -75,7 +75,7 @@ const typesetNode = (node) => {
 export const typeset = () => {
     const elements = document.getElementsByClassName('filter_mathjaxloader_equation');
     for (const element of elements) {
-        if (typeof window.MathJax !== "undefined") {
+        if (typeof window.MathJax.version !== "undefined") {
             typesetNode(element);
         }
     }
@@ -87,7 +87,7 @@ export const typeset = () => {
  * @param {CustomEvent} event - Custom event with "nodes" indicating the root of the updated nodes.
  */
 export const contentUpdated = (event) => {
-    if (typeof window.MathJax === "undefined") {
+    if (typeof window.MathJax.version === "undefined") {
         return;
     }
 
@@ -121,7 +121,15 @@ export const contentUpdated = (event) => {
  * @param {String} url The URL of the MathJax script to load.
  * @param {function} callback The function to call when the script has loaded.
  */
-const loadMathJax = (url, callback) => {
+const loadMathJax = (url, mathjaxconfig, callback) => {
+    // Add mathjax config.
+    window.MathJax = {};
+    const config = JSON.parse(mathjaxconfig);
+    if (config && typeof config === 'object') {
+        for (const [key, value] of Object.entries(config)) {
+            window.MathJax[key] = value;
+        }
+    }
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.onload = () => {
