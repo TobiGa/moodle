@@ -463,6 +463,65 @@ final class api_test extends \advanced_testcase {
     }
 
     /**
+     * Verify that the site guest is never returned as a contact, even if it is stored as a contact.
+     */
+    public function test_message_search_users_guest_contact_excluded(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $user1 = $this->getDataGenerator()->create_user(['firstname' => 'Search', 'lastname' => 'Alpha']);
+        $user2 = $this->getDataGenerator()->create_user(['firstname' => 'Search', 'lastname' => 'Bravo']);
+
+        // Make the guest user match the search term.
+        $guest = guest_user();
+        $DB->set_field('user', 'firstname', 'Search', ['id' => $guest->id]);
+
+        api::add_contact($user1->id, $user2->id);
+        api::add_contact($user1->id, $guest->id);
+
+        $this->setUser($user1);
+        [$contacts] = api::message_search_users($user1->id, 'Search');
+
+        $this->assertCount(1, $contacts);
+        $this->assertEquals($user2->id, $contacts[0]->id);
+    }
+
+    /**
+     * Verify that a contact stored in both directions is returned only once and does not break the limit.
+     */
+    public function test_message_search_users_mutual_contacts(): void {
+        $this->resetAfterTest();
+
+        $user1 = $this->getDataGenerator()->create_user(['firstname' => 'Search', 'lastname' => 'Alpha']);
+        $user2 = $this->getDataGenerator()->create_user(['firstname' => 'Search', 'lastname' => 'Bravo']);
+        $user3 = $this->getDataGenerator()->create_user(['firstname' => 'Search', 'lastname' => 'Charlie']);
+
+        // User1 and user2 are contacts in both directions, user3 is a contact of user1 only.
+        api::add_contact($user1->id, $user2->id);
+        api::add_contact($user2->id, $user1->id);
+        api::add_contact($user3->id, $user1->id);
+
+        $this->setUser($user1);
+        [$contacts] = api::message_search_users($user1->id, 'Search');
+        // Helper::get_member_info() emits a duplicate key debugging message for mutual contacts, this is not tested here.
+        $this->resetDebugging();
+        $this->assertCount(2, $contacts);
+        $this->assertEquals($user2->id, $contacts[0]->id);
+        $this->assertEquals($user3->id, $contacts[1]->id);
+
+        // The mutual contact must count only once against the limit.
+        [$contacts] = api::message_search_users($user1->id, 'Search', 0, 2);
+        $this->resetDebugging();
+        $this->assertCount(2, $contacts);
+        $this->assertEquals($user2->id, $contacts[0]->id);
+        $this->assertEquals($user3->id, $contacts[1]->id);
+
+        [$contacts] = api::message_search_users($user1->id, 'Search', 1, 2);
+        $this->assertCount(1, $contacts);
+        $this->assertEquals($user3->id, $contacts[0]->id);
+    }
+
+    /**
      * Tests searching users as a user having the 'moodle/user:viewdetails' capability.
      */
     public function test_message_search_users_with_cap(): void {
