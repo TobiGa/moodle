@@ -230,15 +230,40 @@ class api {
         $params = array('search' => '%' . $DB->sql_like_escape($search) . '%', 'userid1' => $userid, 'userid2' => $userid);
 
         // Ok, let's search for contacts first.
-        $sql = "SELECT u.id
-                  FROM {user} u
-                  JOIN {message_contacts} mc
-                    ON (u.id = mc.contactid AND mc.userid = :userid1) OR (u.id = mc.userid AND mc.contactid = :userid2)
-                 WHERE u.deleted = 0
-                   AND u.confirmed = 1
-                   AND " . $DB->sql_like($fullname, ':search', false) . "
-                   AND u.id $exclude
-              ORDER BY " . $DB->sql_fullname();
+        // Step one get all relevant userids from contacts.
+        $select = " (userid = :userid1) OR (contactid = :userid2) ";
+        $contacts = $DB->get_records_select('message_contacts', $select, $params, '', 'id, userid, contactid');
+
+        $relevantuserids = [];
+        foreach ($contacts as $contact) {
+            if ($contact->userid == $params['userid1']) {
+                $relevantuserids[$contact->contactid] = $contact->contactid;
+            } else {
+                $relevantuserids[$contact->userid] = $contact->userid;
+            }
+        }
+
+        // Remove excluded userids.
+        $relevantuserids = array_diff($relevantuserids, $excludeparams);
+
+        // Force empty result, when no relevant user is found (no contacts).
+        if (!$relevantuserids) {
+            $sql = "SELECT id FROM {user} WHERE (1 = 2)";
+        } else {
+            // For relevant users do the search.
+            [$inuserids, $inparams] = $DB->get_in_or_equal($relevantuserids, SQL_PARAMS_NAMED, 'u');
+            $params += $inparams;
+
+            $fullname = $DB->sql_fullname();
+
+            $sql = "SELECT u.id
+                    FROM {user} u
+                    WHERE u.deleted = 0
+                    AND u.confirmed = 1
+                    AND " . $DB->sql_like($fullname, ':search', false) . "
+                    AND u.id $inuserids
+                    ORDER BY " . $DB->sql_fullname();
+        }
         $foundusers = $DB->get_records_sql_menu($sql, $params + $excludeparams, $limitfrom, $limitnum);
 
         $contacts = [];
