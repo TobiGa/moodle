@@ -34,12 +34,19 @@ if (!defined('PHPUNIT_READFILE_ACCEL_TEST')) {
     exit(1);
 }
 
-$testdb = moodle_database::get_driver_instance($CFG->dbtype, $CFG->dblibrary);
-$testdb->connect($CFG->dbhost, $CFG->dbuser, $CFG->dbpass, $CFG->dbname, $CFG->phpunit_prefix);
+$dbtype = $CFG->phpunit_dbtype ?? $CFG->dbtype;
+$dblibrary = $CFG->phpunit_dblibrary ?? $CFG->dblibrary;
+$dbhost = $CFG->phpunit_dbhost ?? $CFG->dbhost;
+$dbuser = $CFG->phpunit_dbuser ?? $CFG->dbuser;
+$dbpass = $CFG->phpunit_dbpass ?? $CFG->dbpass;
+$dbname = $CFG->phpunit_dbname ?? $CFG->dbname;
+
+$testdb = moodle_database::get_driver_instance($dbtype, $dblibrary);
+$testdb->connect($dbhost, $dbuser, $dbpass, $dbname, $CFG->phpunit_prefix);
 $DB = $testdb;
 
 set_debugging(DEBUG_DEVELOPER, true);
-$CFG->tempdir = '/tmp';
+$CFG->tempdir = sys_get_temp_dir();
 
 /**
  * Runs readfile_accel() with a file path or a stored_file to trigger the buffer check.
@@ -63,7 +70,7 @@ try {
     // Prepare test file.
     $filename = "readfile_accel.txt";
     // Generate temporary local file for testing.
-    $path = "$CFG->tempdir/$filename";
+    $path = $CFG->tempdir . DIRECTORY_SEPARATOR . $filename;
     file_put_contents($path, "\nMoodle test data\n");
 
     // Populate {files} table.

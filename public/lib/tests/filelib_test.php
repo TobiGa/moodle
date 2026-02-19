@@ -2137,11 +2137,12 @@ EOF;
         $this->resetAfterTest();
 
         // Construct the command to run the CLI script with a custom constant defined.
-        $scriptpath = __DIR__ . '/fixtures/readfile_accel_debug_cli.php';
-        $cmd = 'php -r ' . escapeshellarg("define('PHPUNIT_READFILE_ACCEL_TEST', true); require '$scriptpath';");
+        // Use array form for proc_open to avoid shell escaping issues on Windows.
+        $scriptpath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'readfile_accel_debug_cli.php';
+        $phpcode = "define('PHPUNIT_READFILE_ACCEL_TEST', true); require " . var_export($scriptpath, true) . ";";
 
         $pipes = [];
-        $process = proc_open($cmd, [
+        $process = proc_open([PHP_BINARY, '-r', $phpcode], [
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ], $pipes);
@@ -2157,11 +2158,11 @@ EOF;
         $output = $stdout . $stderr;
 
         // Debug just in case the subprocess fails.
-        $this->assertSame(0, $exitcode);
+        $this->assertSame(0, $exitcode, "Subprocess failed with exit code {$exitcode}. Output:\n{$output}");
 
         // Validate that both path-based and stored_file debugging messages are present.
         $filename = "readfile_accel.txt";
-        $filepath = '/tmp/' . $filename;
+        $filepath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
         $this->assertStringContainsString('Non-empty default output handler buffer detected while serving the file ' .
             $filepath . '. Buffer contents (first 20 characters): test text', $output);
         $this->assertStringContainsString('Non-empty default output handler buffer detected while serving the file ' .
