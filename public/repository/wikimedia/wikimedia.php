@@ -27,6 +27,9 @@ define('WIKIMEDIA_THUMBS_PER_PAGE', 24);
 define('WIKIMEDIA_FILE_NS', 6);
 define('WIKIMEDIA_IMAGE_SIDE_LENGTH', 1024);
 define('WIKIMEDIA_THUMB_SIZE', 120);
+// Standard thumbnail widths accepted by Wikimedia for direct thumbnail requests,
+// see https://www.mediawiki.org/wiki/Common_thumbnail_sizes. Other widths are rejected (HTTP 429).
+define('WIKIMEDIA_STANDARD_THUMB_WIDTHS', [20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840]);
 
 class wikimedia {
     private $_conn  = null;
@@ -112,7 +115,28 @@ class wikimedia {
         return $image_urls;
     }
     /**
+     * Round a requested thumbnail width up to the closest standard Wikimedia thumbnail width.
+     *
+     * Wikimedia rejects direct thumbnail requests that do not use one of the standard widths,
+     * see https://www.mediawiki.org/wiki/Common_thumbnail_sizes.
+     *
+     * @param int $width the requested width
+     * @return int the closest standard width that is not smaller than the requested width
+     */
+    public function get_standard_thumb_width($width) {
+        foreach (WIKIMEDIA_STANDARD_THUMB_WIDTHS as $standardwidth) {
+            if ($standardwidth >= $width) {
+                return $standardwidth;
+            }
+        }
+        return max(WIKIMEDIA_STANDARD_THUMB_WIDTHS);
+    }
+
+    /**
      * Generate thumbnail URL from image URL.
+     *
+     * The requested width is rounded up to one of the standard Wikimedia thumbnail widths,
+     * as non-standard direct thumbnail requests are rejected by Wikimedia.
      *
      * @param string $image_url
      * @param int $orig_width
@@ -132,6 +156,10 @@ class wikimedia {
             $commons_main_dir = 'https://upload.wikimedia.org/wikipedia/commons/';
             if ($image_url) {
                 $short_path = str_replace($commons_main_dir, '', $image_url);
+                // The API may append query parameters (e.g. utm tracking) which must not end up in the thumb path.
+                if (($querypos = strpos($short_path, '?')) !== false) {
+                    $short_path = substr($short_path, 0, $querypos);
+                }
                 $extension = strtolower(pathinfo($short_path, PATHINFO_EXTENSION));
                 if (strcmp($extension, 'gif') == 0) {  //no thumb for gifs
                     return $OUTPUT->image_url(file_extension_icon('.gif'))->out(false);
@@ -140,6 +168,11 @@ class wikimedia {
                 $file_name = end($dir_parts);
                 if ($orig_height > $orig_width) {
                     $thumb_width = round($thumb_width * $orig_width/$orig_height);
+                }
+                $thumb_width = $this->get_standard_thumb_width($thumb_width);
+                if (strcmp($extension, 'svg') != 0 && $thumb_width >= $orig_width) {
+                    // Bitmap images cannot be upscaled, use the original image instead.
+                    return $image_url;
                 }
                 $thumb_url = $commons_main_dir . 'thumb/' . implode('/', $dir_parts) . '/'. $thumb_width .'px-' . $file_name;
                 if (strcmp($extension, 'svg') == 0) {  //png thumb for svg-s
