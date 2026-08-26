@@ -115,4 +115,82 @@ final class repository_test extends \advanced_testcase {
 
         $this->repo->get_file('https://upload.wikimedia.org/wikipedia/commons/test.jpg');
     }
+
+    /**
+     * Test that requested thumbnail widths are rounded up to standard Wikimedia widths.
+     *
+     * @dataProvider get_thumb_url_provider
+     * @param string $imageurl the original image URL
+     * @param int $origwidth original image width
+     * @param int $origheight original image height
+     * @param int $thumbwidth requested thumbnail width
+     * @param bool $force whether to force thumb URL generation
+     * @param string $expected expected URL
+     */
+    public function test_get_thumb_url(
+        string $imageurl,
+        int $origwidth,
+        int $origheight,
+        int $thumbwidth,
+        bool $force,
+        string $expected,
+    ): void {
+        $client = new \wikimedia();
+        $this->assertEquals($expected, $client->get_thumb_url($imageurl, $origwidth, $origheight, $thumbwidth, $force));
+    }
+
+    /**
+     * Data provider for test_get_thumb_url.
+     *
+     * @return array
+     */
+    public static function get_thumb_url_provider(): array {
+        $base = 'https://upload.wikimedia.org/wikipedia/commons/';
+        return [
+            'Landscape image, standard width requested' => [
+                $base . 'a/ab/test.jpg', 1000, 800, 120, false,
+                $base . 'thumb/a/ab/test.jpg/120px-test.jpg',
+            ],
+            'Query parameters stripped from image URL' => [
+                $base . 'a/ab/test.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original',
+                1000, 800, 120, false,
+                $base . 'thumb/a/ab/test.jpg/120px-test.jpg',
+            ],
+            'Non-standard width rounded up to standard width' => [
+                $base . 'a/ab/test.jpg', 1000, 800, 75, false,
+                $base . 'thumb/a/ab/test.jpg/120px-test.jpg',
+            ],
+            'Icon width 24 rounded up to 40' => [
+                $base . 'a/ab/test.jpg', 1000, 800, 24, false,
+                $base . 'thumb/a/ab/test.jpg/40px-test.jpg',
+            ],
+            'Portrait image scaled width rounded up to standard width' => [
+                // Width scaled to 120 * 500 / 1000 = 60, which is already standard.
+                $base . 'a/ab/test.jpg', 500, 1000, 120, false,
+                $base . 'thumb/a/ab/test.jpg/60px-test.jpg',
+            ],
+            'Portrait image with non-standard scaled width' => [
+                // Width scaled to 120 * 700 / 1000 = 84, rounded up to 120.
+                $base . 'a/ab/test.jpg', 700, 1000, 120, false,
+                $base . 'thumb/a/ab/test.jpg/120px-test.jpg',
+            ],
+            'Original returned when image fits into requested size' => [
+                $base . 'a/ab/test.jpg', 100, 80, 120, false,
+                $base . 'a/ab/test.jpg',
+            ],
+            'Original returned when standard width would upscale bitmap' => [
+                // Requested 90 is rounded up to 120, which exceeds the original width of 100.
+                $base . 'a/ab/test.jpg', 100, 80, 90, false,
+                $base . 'a/ab/test.jpg',
+            ],
+            'SVG can be rendered above its original width' => [
+                $base . 'a/ab/test.svg', 512, 512, 512, true,
+                $base . 'thumb/a/ab/test.svg/960px-test.svg.png',
+            ],
+            'Width above largest step capped at largest standard width' => [
+                $base . 'a/ab/test.jpg', 8000, 6000, 4000, false,
+                $base . 'thumb/a/ab/test.jpg/3840px-test.jpg',
+            ],
+        ];
+    }
 }
